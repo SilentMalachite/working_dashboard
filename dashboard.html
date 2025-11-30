@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業ダッシュボード</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .dashboard-container {
+            display: flex;
+            gap: 20px;
+            flex-direction: column; /* Mobile friendly by default, can be row on large screens if needed, but vertical stack is safer for rows */
+        }
+        
+        @media (min-width: 1024px) {
+             .dashboard-layout {
+                display: grid;
+                grid-template-columns: 250px 1fr; /* Sidebar for name tags, Main area for work items */
+                gap: 20px;
+             }
+        }
+
+        /* Name Tag Section (Sidebar) */
+        .name-tag-section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+        .name-tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            min-height: 100px;
+            border: 2px dashed #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            align-content: flex-start;
+        }
+
+        .name-tag {
+            padding: 8px 12px;
+            background-color: #e0e0e0;
+            border-radius: 20px;
+            cursor: grab;
+            user-select: none;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .name-tag:active {
+            cursor: grabbing;
+        }
+
+        .name-tag input.color-picker {
+            width: 15px;
+            height: 15px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            background: none;
+        }
+        
+        .name-tag span {
+            outline: none;
+        }
+
+        .delete-btn {
+            margin-left: 5px;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .delete-btn:hover {
+            color: red;
+        }
+
+        /* Work Item Section */
+        .work-items-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .work-item-row {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: background-color 0.3s;
+        }
+        
+        .row-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .row-btn {
+            background: #eee;
+            color: #333;
+            padding: 5px;
+            font-size: 12px;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .row-btn:hover {
+            background: #ccc;
+        }
+
+        .work-item-title {
+            width: 150px;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 5px;
+            border: 1px solid transparent;
+        }
+        
+        .work-item-title:hover {
+            border: 1px dashed #ccc;
+        }
+        
+        .work-item-title:focus {
+            border: 1px solid #007bff;
+            background: #fff;
+        }
+
+        .stages-container {
+            display: flex;
+            flex: 1;
+            align-items: center;
+            gap: 5px;
+            overflow-x: auto;
+        }
+
+        .stage {
+            flex: 1;
+            min-width: 150px;
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stage-header {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .stage-content {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-content: flex-start;
+        }
+        
+        .arrow {
+            font-size: 20px;
+            color: #bbb;
+            font-weight: bold;
+        }
+        
+        .color-picker-wrapper {
+            position: relative;
+        }
+        
+        /* Dragging styles */
+        .dragging {
+            opacity: 0.5;
+        }
+        
+        .drag-over {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>作業ダッシュボード</h1>
+
+    <div class="dashboard-layout">
+        <!-- Name Tags Sidebar -->
+        <div class="name-tag-section">
+            <h3>名札 (人員)</h3>
+            <div class="controls">
+                <button onclick="addNameTag()">名札を追加</button>
+            </div>
+            <div id="nameTagPool" class="name-tag-container" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <!-- Tags will be added here -->
+            </div>
+        </div>
+
+        <!-- Work Items Main Area -->
+        <div class="work-items-section">
+            <div class="controls" style="justify-content: flex-start;">
+                <button onclick="addWorkItem()">作業項目を追加</button>
+            </div>
+            <div id="workItemsContainer">
+                <!-- Work Item Rows will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Data & State Management ---
+        let tagIdCounter = 0;
+        let workItemIdCounter = 0;
+
+        // --- Drag and Drop Handlers ---
+        function allowDrop(ev) {
+            ev.preventDefault();
+            ev.target.closest('.stage-content, .name-tag-container').classList.add('drag-over');
+        }
+        
+        // Helper to remove drag-over class when leaving
+        document.addEventListener('dragleave', function(ev) {
+            if (ev.target.classList.contains('stage-content') || ev.target.classList.contains('name-tag-container')) {
+                ev.target.classList.remove('drag-over');
+            }
+            // Check parents too just in case
+             const dropZone = ev.target.closest('.stage-content, .name-tag-container');
+             if (dropZone && !dropZone.contains(ev.relatedTarget)) {
+                 dropZone.classList.remove('drag-over');
+             }
+        });
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text/plain", ev.target.id);
+            ev.target.classList.add('dragging');
+        }
+        
+        function dragEnd(ev) {
+            ev.target.classList.remove('dragging');
+            // Clean up all drag-over classes
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text/plain");
+            const draggedElement = document.getElementById(data);
+            
+            // Find the closest valid drop target
+            const dropZone = ev.target.closest('.stage-content') || ev.target.closest('.name-tag-container');
+            
+            if (dropZone && draggedElement) {
+                dropZone.classList.remove('drag-over');
+                dropZone.appendChild(draggedElement);
+            }
+        }
+
+        // --- Component Creation ---
+
+        function createColorPicker(onChange) {
+            const input = document.createElement('input');
+            input.type = 'color';
+            input.className = 'color-picker';
+            input.value = '#e0e0e0';
+            input.oninput = (e) => onChange(e.target.value);
+            return input;
+        }
+
+        function addNameTag(name = "新しい名札") {
+            tagIdCounter++;
+            const id = `tag-${tagIdCounter}`;
+            
+            const tag = document.createElement('div');
+            tag.className = 'name-tag';
+            tag.id = id;
+            tag.draggable = true;
+            tag.ondragstart = drag;
+            tag.ondragend = dragEnd;
+            
+            // Color picker
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = '#e0e0e0';
+            colorInput.style.border = 'none';
+            colorInput.style.width = '20px';
+            colorInput.style.height = '20px';
+            colorInput.style.cursor = 'pointer';
+            colorInput.style.padding = '0';
+            colorInput.style.background = 'none';
+            colorInput.oninput = function(e) {
+                tag.style.backgroundColor = e.target.value;
+                // Determine text color based on background brightness for readability could be added here
+            };
+            
+            // Editable Name
+            const nameSpan = document.createElement('span');
+            nameSpan.contentEditable = true;
+            nameSpan.textContent = name;
+            
+            // Delete button
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.onclick = function() {
+                if(confirm('この名札を削除しますか？')) {
+                    tag.remove();
+                }
+            };
+
+            tag.appendChild(colorInput);
+            tag.appendChild(nameSpan);
+            tag.appendChild(deleteBtn);
+            
+            document.getElementById('nameTagPool').appendChild(tag);
+        }
+
+        function addWorkItem(title = "新しい作業項目") {
+            workItemIdCounter++;
+            const id = `work-item-${workItemIdCounter}`;
+            
+            const container = document.getElementById('workItemsContainer');
+            const row = document.createElement('div');
+            row.className = 'work-item-row';
+            row.id = id;
+
+            // Controls (Up/Down/Delete)
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'row-controls';
+            
+            const upBtn = document.createElement('button');
+            upBtn.className = 'row-btn';
+            upBtn.innerHTML = '▲';
+            upBtn.title = '上に移動';
+            upBtn.onclick = () => moveRow(row, -1);
+            
+            const downBtn = document.createElement('button');
+            downBtn.className = 'row-btn';
+            downBtn.innerHTML = '▼';
+            downBtn.title = '下に移動';
+            downBtn.onclick = () => moveRow(row, 1);
+            
+            const delBtn = document.createElement('button');
+            delBtn.className = 'row-btn';
+            delBtn.innerHTML = '×';
+            delBtn.style.color = 'red';
+            delBtn.title = '削除';
+            delBtn.onclick = () => {
+                // Move tags back to pool before deleting row to prevent loss? 
+                // Spec doesn't specify, but it's good UX. 
+                // For now, simple delete is fine, tags inside will be deleted.
+                if(confirm('この作業項目を削除しますか？')) {
+                    // Optional: Recover tags
+                    const tags = row.querySelectorAll('.name-tag');
+                    const pool = document.getElementById('nameTagPool');
+                    tags.forEach(tag => pool.appendChild(tag));
+                    row.remove();
+                }
+            };
+
+            controlsDiv.appendChild(upBtn);
+            controlsDiv.appendChild(downBtn);
+            controlsDiv.appendChild(delBtn);
+            
+            // Color strip for row grouping visual
+            const colorStrip = document.createElement('input');
+            colorStrip.type = 'color';
+            colorStrip.value = '#ffffff';
+            colorStrip.style.width = '20px';
+            colorStrip.style.height = '40px';
+            colorStrip.style.border = 'none';
+            colorStrip.style.padding = '0';
+            colorStrip.style.background = 'none';
+            colorStrip.style.cursor = 'pointer';
+            colorStrip.title = '背景色を変更';
+            colorStrip.oninput = (e) => {
+                row.style.backgroundColor = e.target.value;
+            };
+
+            // Title
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'work-item-title';
+            titleDiv.contentEditable = true;
+            titleDiv.textContent = title;
+
+            // Stages Container
+            const stagesContainer = document.createElement('div');
+            stagesContainer.className = 'stages-container';
+
+            // Stages
+            const stages = [
+                { name: '一次作業', id: 'first' },
+                { name: 'ダブルチェック', id: 'double-check' },
+                { name: '最終確認', id: 'final' }
+            ];
+
+            stages.forEach((stageInfo, index) => {
+                const stageDiv = document.createElement('div');
+                stageDiv.className = 'stage';
+                
+                const stageHeader = document.createElement('div');
+                stageHeader.className = 'stage-header';
+                stageHeader.textContent = stageInfo.name;
+                
+                const stageContent = document.createElement('div');
+                stageContent.className = 'stage-content';
+                stageContent.ondrop = drop;
+                stageContent.ondragover = allowDrop;
+                
+                stageDiv.appendChild(stageHeader);
+                stageDiv.appendChild(stageContent);
+                stagesContainer.appendChild(stageDiv);
+
+                // Add arrow if not last
+                if (index < stages.length - 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow';
+                    arrow.innerHTML = '→';
+                    stagesContainer.appendChild(arrow);
+                }
+            });
+
+            row.appendChild(controlsDiv);
+            row.appendChild(colorStrip);
+            row.appendChild(titleDiv);
+            row.appendChild(stagesContainer);
+
+            container.appendChild(row);
+        }
+
+        function moveRow(row, direction) {
+            const container = document.getElementById('workItemsContainer');
+            if (direction === -1) {
+                if (row.previousElementSibling) {
+                    container.insertBefore(row, row.previousElementSibling);
+                }
+            } else {
+                if (row.nextElementSibling) {
+                    container.insertBefore(row.nextElementSibling, row); // Insert next before current = effectively swap? No.
+                    // insertBefore(newNode, referenceNode). 
+                    // To move down: insert row after next sibling. 
+                    // which is insertBefore(row, next.next)
+                    container.insertBefore(row, row.nextElementSibling.nextElementSibling);
+                }
+            }
+        }
+
+        // --- Initialization ---
+        window.onload = function() {
+            // Add some initial data for demo
+            addNameTag("佐藤");
+            addNameTag("鈴木");
+            addNameTag("田中");
+            
+            addWorkItem("ホームページ更新");
+            addWorkItem("バグ修正 #102");
+        };
+
+    </script>
+</body>
+</html>
