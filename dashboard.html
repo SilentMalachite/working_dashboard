@@ -239,6 +239,7 @@
             <h3>名札 (人員)</h3>
             <div class="controls">
                 <button onclick="addNameTag()">名札を追加</button>
+                <button onclick="resetNameTags()" style="background-color: #6c757d;">配置リセット</button>
             </div>
             <div id="nameTagPool" class="name-tag-container" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <!-- Tags will be added here -->
@@ -249,6 +250,7 @@
         <div class="work-items-section">
             <div class="controls" style="justify-content: flex-start;">
                 <button onclick="addWorkItem()">作業項目を追加</button>
+                <button onclick="resetWorkItems()" style="background-color: #dc3545;">作業全消去</button>
             </div>
             <div id="workItemsContainer">
                 <!-- Work Item Rows will be added here -->
@@ -302,6 +304,35 @@
                 dropZone.classList.remove('drag-over');
                 dropZone.appendChild(draggedElement);
             }
+        }
+
+        // --- Reset Functionality ---
+        function resetNameTags() {
+            if (!confirm('すべての名札を初期位置に戻しますか？')) {
+                return;
+            }
+            const pool = document.getElementById('nameTagPool');
+            const allTags = document.querySelectorAll('.name-tag');
+            
+            allTags.forEach(tag => {
+                pool.appendChild(tag);
+            });
+        }
+
+        function resetWorkItems() {
+            if (!confirm('すべての作業項目を削除しますか？\n（名札はプールに戻ります）')) {
+                return;
+            }
+            const pool = document.getElementById('nameTagPool');
+            const rows = document.querySelectorAll('.work-item-row');
+            
+            rows.forEach(row => {
+                // Rescue tags
+                const tags = row.querySelectorAll('.name-tag');
+                tags.forEach(tag => pool.appendChild(tag));
+                // Remove row
+                row.remove();
+            });
         }
 
         // --- Component Creation ---

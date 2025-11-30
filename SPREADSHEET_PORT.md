@@ -257,14 +257,18 @@ function loadDashboardState() {
         <div class="name-tag-section">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                 <strong>人員 (名札)</strong>
-                <button onclick="addNameTag()" style="padding:2px 8px; font-size:10px;">＋追加</button>
+                <div>
+                    <button onclick="addNameTag()" style="padding:2px 8px; font-size:10px;">＋追加</button>
+                    <button onclick="resetNameTags()" style="padding:2px 8px; font-size:10px; background-color: #6c757d;">配置リセット</button>
+                </div>
             </div>
             <div id="nameTagPool" class="name-tag-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
         </div>
 
         <div class="work-items-section">
-            <div style="margin-bottom:5px;">
-                <button onclick="addWorkItem()" style="width:100%;">＋ 作業項目を追加</button>
+            <div style="margin-bottom:5px; display: flex; gap: 5px;">
+                <button onclick="addWorkItem()" style="flex: 1;">＋ 作業項目を追加</button>
+                <button onclick="resetWorkItems()" style="background-color: #dc3545;">作業全消去</button>
             </div>
             <div id="workItemsContainer"></div>
         </div>
@@ -307,6 +311,22 @@ function loadDashboardState() {
                 dropZone.classList.remove('drag-over');
                 dropZone.appendChild(draggedElement);
             }
+        }
+
+        // --- Reset Functions ---
+        function resetNameTags() {
+            if (!confirm('すべての名札を初期位置に戻しますか？')) return;
+            const pool = document.getElementById('nameTagPool');
+            document.querySelectorAll('.name-tag').forEach(tag => pool.appendChild(tag));
+        }
+
+        function resetWorkItems() {
+            if (!confirm('すべての作業項目を削除しますか？\\n（名札はプールに戻ります）')) return;
+            const pool = document.getElementById('nameTagPool');
+            document.querySelectorAll('.work-item-row').forEach(row => {
+                row.querySelectorAll('.name-tag').forEach(tag => pool.appendChild(tag));
+                row.remove();
+            });
         }
 
         // --- Components ---

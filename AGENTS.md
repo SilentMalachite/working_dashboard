@@ -20,6 +20,11 @@
 
 - Name tags should be freely color-coded to match teams, roles, or preferences (e.g., via CSS or attributes).
 - Individual name tags can be dragged and dropped onto specific work item groups to assign personnel to tasks dynamically.
+- **Reset Feature**: Include a "Reset Name Tags" button in the name tag section to move all distributed name tags back to the name tag pool.
+
+### Dashboard Controls
+
+- **Work Item Reset**: Include a "Reset Work Items" button to remove all work item rows. Name tags assigned to these rows must be preserved and returned to the name tag pool automatically.
 
 ## Technical Requirements
 
