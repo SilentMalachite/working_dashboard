@@ -262,6 +262,138 @@
         // --- Data & State Management ---
         let tagIdCounter = 0;
         let workItemIdCounter = 0;
+        const STORAGE_KEY = 'workingDashboardData';
+        
+        // --- Auto Save Functions ---
+        function saveToLocalStorage() {
+            try {
+                const data = {
+                    tagIdCounter: tagIdCounter,
+                    workItemIdCounter: workItemIdCounter,
+                    nameTags: [],
+                    workItems: []
+                };
+                
+                // Save all name tags
+                document.querySelectorAll('.name-tag').forEach(tag => {
+                    const nameSpan = tag.querySelector('span[contenteditable]');
+                    const colorInput = tag.querySelector('input[type="color"]');
+                    const parentId = tag.parentElement.id || tag.closest('.stage-content')?.parentElement?.parentElement?.id || 'nameTagPool';
+                    
+                    data.nameTags.push({
+                        id: tag.id,
+                        name: nameSpan ? nameSpan.textContent : '',
+                        color: colorInput ? colorInput.value : '#e0e0e0',
+                        parentId: parentId
+                    });
+                });
+                
+                // Save all work items
+                document.querySelectorAll('.work-item-row').forEach(row => {
+                    const titleDiv = row.querySelector('.work-item-title');
+                    const colorInput = row.querySelector('input[type="color"]');
+                    const stages = [];
+                    
+                    row.querySelectorAll('.stage-content').forEach((stageContent, index) => {
+                        const stageNames = ['first', 'double-check', 'final'];
+                        const tagIds = Array.from(stageContent.querySelectorAll('.name-tag')).map(tag => tag.id);
+                        stages.push({
+                            name: stageNames[index],
+                            tagIds: tagIds
+                        });
+                    });
+                    
+                    data.workItems.push({
+                        id: row.id,
+                        title: titleDiv ? titleDiv.textContent : '',
+                        color: colorInput ? colorInput.value : '#ffffff',
+                        stages: stages
+                    });
+                });
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                console.log('データを保存しました');
+            } catch (error) {
+                console.error('保存エラー:', error);
+            }
+        }
+        
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) return false;
+                
+                const data = JSON.parse(saved);
+                
+                // Restore counters
+                tagIdCounter = data.tagIdCounter || 0;
+                workItemIdCounter = data.workItemIdCounter || 0;
+                
+                // Clear existing content
+                document.getElementById('nameTagPool').innerHTML = '';
+                document.getElementById('workItemsContainer').innerHTML = '';
+                
+                // Restore work items first
+                data.workItems.forEach(item => {
+                    addWorkItem(item.title);
+                    const row = document.getElementById(item.id);
+                    if (row) {
+                        const colorInput = row.querySelector('input[type="color"]');
+                        if (colorInput) {
+                            colorInput.value = item.color;
+                            row.style.backgroundColor = item.color;
+                        }
+                    }
+                });
+                
+                // Restore name tags
+                data.nameTags.forEach(tagData => {
+                    addNameTag(tagData.name);
+                    const tag = document.getElementById(tagData.id);
+                    if (tag) {
+                        const colorInput = tag.querySelector('input[type="color"]');
+                        if (colorInput) {
+                            colorInput.value = tagData.color;
+                            tag.style.backgroundColor = tagData.color;
+                        }
+                        
+                        // Move tag to correct location
+                        if (tagData.parentId !== 'nameTagPool') {
+                            const workItem = document.getElementById(tagData.parentId);
+                            if (workItem) {
+                                // Find the correct stage
+                                const savedItem = data.workItems.find(item => item.id === tagData.parentId);
+                                if (savedItem) {
+                                    savedItem.stages.forEach((stage, index) => {
+                                        if (stage.tagIds.includes(tagData.id)) {
+                                            const stageContent = workItem.querySelectorAll('.stage-content')[index];
+                                            if (stageContent) {
+                                                stageContent.appendChild(tag);
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                console.log('データを読み込みました');
+                return true;
+            } catch (error) {
+                console.error('読み込みエラー:', error);
+                return false;
+            }
+        }
+        
+        // Auto-save trigger
+        function triggerAutoSave() {
+            // Debounce to avoid excessive saves
+            if (window.autoSaveTimeout) {
+                clearTimeout(window.autoSaveTimeout);
+            }
+            window.autoSaveTimeout = setTimeout(saveToLocalStorage, 500);
+        }
 
         // --- Drag and Drop Handlers ---
         function allowDrop(ev) {
@@ -303,6 +435,7 @@
             if (dropZone && draggedElement) {
                 dropZone.classList.remove('drag-over');
                 dropZone.appendChild(draggedElement);
+                triggerAutoSave();
             }
         }
 
@@ -317,6 +450,7 @@
             allTags.forEach(tag => {
                 pool.appendChild(tag);
             });
+            triggerAutoSave();
         }
 
         function resetWorkItems() {
@@ -333,6 +467,7 @@
                 // Remove row
                 row.remove();
             });
+            triggerAutoSave();
         }
 
         // --- Component Creation ---
@@ -369,13 +504,20 @@
             colorInput.style.background = 'none';
             colorInput.oninput = function(e) {
                 tag.style.backgroundColor = e.target.value;
-                // Determine text color based on background brightness for readability could be added here
+                triggerAutoSave();
             };
             
             // Editable Name
             const nameSpan = document.createElement('span');
             nameSpan.contentEditable = true;
             nameSpan.textContent = name;
+            nameSpan.addEventListener('blur', triggerAutoSave);
+            nameSpan.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
             
             // Delete button
             const deleteBtn = document.createElement('span');
@@ -384,6 +526,7 @@
             deleteBtn.onclick = function() {
                 if(confirm('この名札を削除しますか？')) {
                     tag.remove();
+                    triggerAutoSave();
                 }
             };
 
@@ -392,6 +535,7 @@
             tag.appendChild(deleteBtn);
             
             document.getElementById('nameTagPool').appendChild(tag);
+            triggerAutoSave();
         }
 
         function addWorkItem(title = "新しい作業項目") {
@@ -425,15 +569,12 @@
             delBtn.style.color = 'red';
             delBtn.title = '削除';
             delBtn.onclick = () => {
-                // Move tags back to pool before deleting row to prevent loss? 
-                // Spec doesn't specify, but it's good UX. 
-                // For now, simple delete is fine, tags inside will be deleted.
                 if(confirm('この作業項目を削除しますか？')) {
-                    // Optional: Recover tags
                     const tags = row.querySelectorAll('.name-tag');
                     const pool = document.getElementById('nameTagPool');
                     tags.forEach(tag => pool.appendChild(tag));
                     row.remove();
+                    triggerAutoSave();
                 }
             };
 
@@ -454,6 +595,7 @@
             colorStrip.title = '背景色を変更';
             colorStrip.oninput = (e) => {
                 row.style.backgroundColor = e.target.value;
+                triggerAutoSave();
             };
 
             // Title
@@ -461,6 +603,13 @@
             titleDiv.className = 'work-item-title';
             titleDiv.contentEditable = true;
             titleDiv.textContent = title;
+            titleDiv.addEventListener('blur', triggerAutoSave);
+            titleDiv.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
 
             // Stages Container
             const stagesContainer = document.createElement('div');
@@ -505,6 +654,7 @@
             row.appendChild(stagesContainer);
 
             container.appendChild(row);
+            triggerAutoSave();
         }
 
         function moveRow(row, direction) {
@@ -512,27 +662,33 @@
             if (direction === -1) {
                 if (row.previousElementSibling) {
                     container.insertBefore(row, row.previousElementSibling);
+                    triggerAutoSave();
                 }
             } else {
                 if (row.nextElementSibling) {
-                    container.insertBefore(row.nextElementSibling, row); // Insert next before current = effectively swap? No.
-                    // insertBefore(newNode, referenceNode). 
-                    // To move down: insert row after next sibling. 
-                    // which is insertBefore(row, next.next)
                     container.insertBefore(row, row.nextElementSibling.nextElementSibling);
+                    triggerAutoSave();
                 }
             }
         }
 
         // --- Initialization ---
         window.onload = function() {
-            // Add some initial data for demo
-            addNameTag("佐藤");
-            addNameTag("鈴木");
-            addNameTag("田中");
+            // Try to load saved data
+            const loaded = loadFromLocalStorage();
             
-            addWorkItem("ホームページ更新");
-            addWorkItem("バグ修正 #102");
+            // If no saved data, add initial demo data
+            if (!loaded) {
+                addNameTag("佐藤");
+                addNameTag("鈴木");
+                addNameTag("田中");
+                
+                addWorkItem("ホームページ更新");
+                addWorkItem("バグ修正 #102");
+                
+                // Save initial state
+                saveToLocalStorage();
+            }
         };
 
     </script>
