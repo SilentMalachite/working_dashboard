@@ -430,9 +430,14 @@
             const draggedElement = document.getElementById(data);
             
             // Find the closest valid drop target
-            const dropZone = ev.target.closest('.stage-content') || ev.target.closest('.name-tag-container');
+            let dropZone = ev.target.closest('.stage-content') || ev.target.closest('.name-tag-container');
             
-            if (dropZone && draggedElement) {
+            // If dropped directly on a name tag in the pool, use the pool container
+            if (!dropZone && ev.target.classList.contains('name-tag')) {
+                dropZone = ev.target.parentElement;
+            }
+            
+            if (dropZone && draggedElement && draggedElement.classList.contains('name-tag')) {
                 dropZone.classList.remove('drag-over');
                 dropZone.appendChild(draggedElement);
                 triggerAutoSave();
