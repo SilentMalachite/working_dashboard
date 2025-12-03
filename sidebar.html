@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      margin: 0;
+      padding: 15px;
+      background-color: #f5f5f5;
+    }
+    
+    h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    
+    .section {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 5px 0;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #0056b3;
+    }
+    
+    button.danger {
+      background-color: #dc3545;
+    }
+    
+    button.danger:hover {
+      background-color: #c82333;
+    }
+    
+    button.secondary {
+      background-color: #6c757d;
+    }
+    
+    button.secondary:hover {
+      background-color: #5a6268;
+    }
+    
+    input[type="text"], input[type="color"] {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    
+    .instructions {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f0f8ff;
+      border-radius: 4px;
+      border-left: 3px solid #007bff;
+    }
+    
+    .color-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0;
+    }
+    
+    .color-group label {
+      flex: 1;
+      font-size: 13px;
+    }
+    
+    .color-group input[type="color"] {
+      width: 50px;
+      height: 35px;
+      padding: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="section">
+    <h3>📋 作業項目の操作</h3>
+    <button onclick="addNewWorkItem()">作業項目を追加</button>
+    <button class="danger" onclick="clearAllWorkItems()">作業項目を全消去</button>
+  </div>
+  
+  <div class="section">
+    <h3>👤 名札の操作</h3>
+    <button onclick="addNewNameTag()">名札を追加</button>
+    <button class="secondary" onclick="resetAllNameTags()">配置リセット</button>
+  </div>
+  
+  <div class="section">
+    <h3>🎨 色の設定</h3>
+    <div class="color-group">
+      <label>選択セルの色:</label>
+      <input type="color" id="cellColor" value="#e0e0e0">
+    </div>
+    <button onclick="applyColor()">色を適用</button>
+  </div>
+  
+  <div class="section">
+    <h3>ℹ️ 使い方</h3>
+    <div class="instructions">
+      <strong>名札の移動:</strong><br>
+      名札をコピー(Ctrl+C/Cmd+C)して、目的のセルに貼り付け(Ctrl+V/Cmd+V)してください。<br><br>
+      
+      <strong>名札の編集:</strong><br>
+      セルをダブルクリックして名前を変更できます。<br><br>
+      
+      <strong>作業項目の編集:</strong><br>
+      A列のセルをダブルクリックして作業項目名を変更できます。<br><br>
+      
+      <strong>ステージ:</strong><br>
+      • C列: 一次作業<br>
+      • E列: ダブルチェック<br>
+      • G列: 最終確認
+    </div>
+  </div>
+  
+  <script>
+    // 作業項目を追加
+    function addNewWorkItem() {
+      const title = prompt('作業項目名を入力してください:');
+      if (title) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目「' + title + '」を追加しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .addWorkItem(title);
+      }
+    }
+    
+    // 作業項目を全消去
+    function clearAllWorkItems() {
+      if (confirm('すべての作業項目を削除しますか？\n（名札は名札プールに戻ります）')) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目を削除しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .resetWorkItems();
+      }
+    }
+    
+    // 名札を追加
+    function addNewNameTag() {
+      const name = prompt('名前を入力してください:');
+      if (name) {
+        google.script.run
+          .withSuccessHandler(() => alert('名札「' + name + '」を追加しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .addNameTag(name);
+      }
+    }
+    
+    // 名札をリセット
+    function resetAllNameTags() {
+      if (confirm('すべての名札を名札プールに戻しますか？')) {
+        google.script.run
+          .withSuccessHandler(() => alert('名札をリセットしました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .resetNameTags();
+      }
+    }
+    
+    // 色を適用
+    function applyColor() {
+      const color = document.getElementById('cellColor').value;
+      const cell = prompt('セル番号を入力してください (例: B3, C5):');
+      
+      if (cell) {
+        google.script.run
+          .withSuccessHandler(() => alert('色を適用しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .changeCellColor(cell, color);
+      }
+    }
+  </script>
+</body>
+</html>
