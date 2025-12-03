@@ -5,6 +5,8 @@
 const SHEET_NAME = '作業ダッシュボード';
 const NAME_TAG_POOL_COL = 'B';  // 名札プールの列
 const WORK_ITEMS_START_ROW = 3;  // 作業項目の開始行
+const HISTORY_KEY = 'UNDO_HISTORY';  // Undo履歴のキー
+const MAX_HISTORY = 20;  // 最大履歴数
 
 // メニューを追加
 function onOpen() {
@@ -17,6 +19,8 @@ function onOpen() {
     .addSeparator()
     .addItem('名札を配置リセット', 'resetNameTags')
     .addItem('作業項目を全消去', 'resetWorkItems')
+    .addSeparator()
+    .addItem('元に戻す (Undo)', 'undo')
     .addSeparator()
     .addItem('サイドバーを開く', 'showSidebar')
     .addToUi();
@@ -292,12 +296,17 @@ function changeCellColor(cell, color) {
 
 // 作業項目を上下に移動
 function moveWorkItem(row, direction) {
+  captureStateToHistory();  // Undo履歴に保存
+  
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) return;
   
   const targetRow = direction === 'up' ? row - 1 : row + 1;
   
   if (targetRow < 3) return;  // ヘッダーより上には移動できない
+  
+  // 移動先が空の場合は移動しない
+  if (sheet.getRange('A' + targetRow).getValue() === '') return;
   
   // 行全体を入れ替え
   const sourceRange = sheet.getRange(row + ':' + row);
@@ -306,12 +315,222 @@ function moveWorkItem(row, direction) {
   // 一時的に値を保存
   const sourceValues = sourceRange.getValues();
   const sourceBackgrounds = sourceRange.getBackgrounds();
+  const sourceFontWeights = sourceRange.getFontWeights();
   const targetValues = targetRange.getValues();
   const targetBackgrounds = targetRange.getBackgrounds();
+  const targetFontWeights = targetRange.getFontWeights();
   
   // 入れ替え
   sourceRange.setValues(targetValues);
   sourceRange.setBackgrounds(targetBackgrounds);
+  sourceRange.setFontWeights(targetFontWeights);
   targetRange.setValues(sourceValues);
   targetRange.setBackgrounds(sourceBackgrounds);
+  targetRange.setFontWeights(sourceFontWeights);
+}
+
+// ===========================================
+// Undo機能の実装
+// ===========================================
+
+// 現在の状態をキャプチャして履歴に保存
+function captureStateToHistory() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!sheet) return;
+    
+    const state = {
+      timestamp: new Date().getTime(),
+      data: [],
+      backgrounds: [],
+      fontWeights: [],
+      lastRow: sheet.getLastRow(),
+      lastColumn: sheet.getLastColumn()
+    };
+    
+    // 全データをキャプチャ
+    if (state.lastRow >= 1) {
+      const dataRange = sheet.getRange(1, 1, state.lastRow, state.lastColumn);
+      state.data = dataRange.getValues();
+      state.backgrounds = dataRange.getBackgrounds();
+      state.fontWeights = dataRange.getFontWeights();
+    }
+    
+    // 履歴を取得
+    const properties = PropertiesService.getDocumentProperties();
+    let history = [];
+    const historyJson = properties.getProperty(HISTORY_KEY);
+    if (historyJson) {
+      history = JSON.parse(historyJson);
+    }
+    
+    // 新しい状態を追加
+    history.push(state);
+    
+    // 履歴の上限を管理
+    if (history.length > MAX_HISTORY) {
+      history.shift();
+    }
+    
+    // 保存
+    properties.setProperty(HISTORY_KEY, JSON.stringify(history));
+  } catch (error) {
+    console.error('Undo履歴のキャプチャに失敗しました:', error);
+  }
+}
+
+// Undo実行
+function undo() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const properties = PropertiesService.getDocumentProperties();
+    const historyJson = properties.getProperty(HISTORY_KEY);
+    
+    if (!historyJson) {
+      ui.alert('元に戻せる操作がありません');
+      return;
+    }
+    
+    const history = JSON.parse(historyJson);
+    
+    if (history.length === 0) {
+      ui.alert('元に戻せる操作がありません');
+      return;
+    }
+    
+    // 最後の状態を取り出す
+    const previousState = history.pop();
+    
+    // 履歴を更新
+    properties.setProperty(HISTORY_KEY, JSON.stringify(history));
+    
+    // 状態を復元
+    restoreState(previousState);
+    
+    ui.alert('元に戻しました！');
+  } catch (error) {
+    ui.alert('エラー: ' + error.toString());
+  }
+}
+
+// 状態を復元
+function restoreState(state) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  
+  // シートをクリア
+  sheet.clear();
+  
+  // データを復元
+  if (state.data && state.data.length > 0) {
+    const dataRange = sheet.getRange(1, 1, state.lastRow, state.lastColumn);
+    dataRange.setValues(state.data);
+    dataRange.setBackgrounds(state.backgrounds);
+    dataRange.setFontWeights(state.fontWeights);
+  }
+  
+  // 列幅を再設定
+  sheet.setColumnWidth(1, 150);
+  sheet.setColumnWidth(2, 200);
+  sheet.setColumnWidth(3, 200);
+  sheet.setColumnWidth(4, 50);
+  sheet.setColumnWidth(5, 200);
+  sheet.setColumnWidth(6, 50);
+  sheet.setColumnWidth(7, 200);
+}
+
+// Undo履歴をクリア
+function clearUndoHistory() {
+  const properties = PropertiesService.getDocumentProperties();
+  properties.deleteProperty(HISTORY_KEY);
+}
+
+// ===========================================
+// 新しい機能: 色の変更と名札・作業項目の削除
+// ===========================================
+
+// 名札の色を変更
+function changeNameTagColor(cell, color) {
+  captureStateToHistory();  // Undo履歴に保存
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  
+  const range = sheet.getRange(cell);
+  range.setBackground(color);
+}
+
+// 作業項目の色を変更
+function changeWorkItemColor(row, color) {
+  captureStateToHistory();  // Undo履歴に保存
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  
+  // A列からG列までの背景色を変更
+  const range = sheet.getRange(row + ':' + row);
+  range.setBackground(color);
+}
+
+// 名札を削除
+function deleteNameTag(cell) {
+  captureStateToHistory();  // Undo履歴に保存
+  
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert('確認', '名札「' + cell + '」を削除しますか？', ui.ButtonSet.YES_NO);
+  
+  if (response !== ui.Button.YES) {
+    return;
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  
+  const range = sheet.getRange(cell);
+  range.clear();
+  
+  ui.alert('名札を削除しました！');
+}
+
+// 作業項目を削除
+function deleteWorkItem(row) {
+  captureStateToHistory();  // Undo履歴に保存
+  
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return;
+  
+  const title = sheet.getRange('A' + row).getValue();
+  const response = ui.alert('確認', '作業項目「' + title + '」を削除しますか？\n（名札は名札プールに戻ります）', ui.ButtonSet.YES_NO);
+  
+  if (response !== ui.Button.YES) {
+    return;
+  }
+  
+  // 名札を回収
+  const stageCols = ['C', 'E', 'G'];
+  const nameTags = [];
+  
+  stageCols.forEach(col => {
+    const cell = sheet.getRange(col + row);
+    const value = cell.getValue();
+    if (value) {
+      nameTags.push(value);
+    }
+  });
+  
+  // 行を削除
+  sheet.deleteRow(row);
+  
+  // 名札を名札プールに戻す
+  nameTags.forEach(name => {
+    let poolRow = 3;
+    while (sheet.getRange('B' + poolRow).getValue() !== '') {
+      poolRow++;
+    }
+    addNameTag(name, sheet);
+  });
+  
+  ui.alert('作業項目を削除しました！');
 }

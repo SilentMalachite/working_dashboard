@@ -1,5 +1,31 @@
 # Working Dashboard Specification
 
+## 最終更新日: 2025-12-03
+
+## 現在の実装状況
+
+### HTML版 (dashboard.html)
+- ✅ 基本的な作業項目と名札の管理
+- ✅ ドラッグ&ドロップ機能
+- ✅ LocalStorageを使った自動保存
+- ✅ Undo機能（最大50回）
+- ✅ 名札と作業項目の色変更
+- ✅ 作業項目の上下移動
+- ✅ 名札と作業項目の個別削除
+
+### Googleスプレッドシート版 (gas_dashboard.gs + sidebar.html)
+- ✅ スプレッドシートのセルを使用したダッシュボード
+- ✅ メニューからの各種操作
+- ✅ サイドバーからの追加操作
+- ✅ Undo機能（最大20回、PropertiesService使用）
+- ✅ 名札と作業項目の色変更
+- ✅ 作業項目の上下移動
+- ✅ 名札と作業項目の個別削除
+- ✅ コピー&ペーストでの名札移動
+- ✅ 複数人での共同編集対応
+
+---
+
 ## Dashboard Structure
 
 ### Overall Dashboard Composition

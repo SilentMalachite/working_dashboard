@@ -99,12 +99,16 @@
   <div class="section">
     <h3>📋 作業項目の操作</h3>
     <button onclick="addNewWorkItem()">作業項目を追加</button>
+    <button onclick="moveWorkItemUp()">作業項目を上に移動</button>
+    <button onclick="moveWorkItemDown()">作業項目を下に移動</button>
+    <button onclick="deleteWorkItemByUser()" style="background-color: #ff6b6b;">作業項目を削除</button>
     <button class="danger" onclick="clearAllWorkItems()">作業項目を全消去</button>
   </div>
   
   <div class="section">
     <h3>👤 名札の操作</h3>
     <button onclick="addNewNameTag()">名札を追加</button>
+    <button onclick="deleteNameTagByUser()" style="background-color: #ff6b6b;">名札を削除</button>
     <button class="secondary" onclick="resetAllNameTags()">配置リセット</button>
   </div>
   
@@ -114,7 +118,14 @@
       <label>選択セルの色:</label>
       <input type="color" id="cellColor" value="#e0e0e0">
     </div>
-    <button onclick="applyColor()">色を適用</button>
+    <button onclick="applyColor()">セルに色を適用</button>
+    <button onclick="applyNameTagColor()">名札に色を適用</button>
+    <button onclick="applyWorkItemColor()">作業項目に色を適用</button>
+  </div>
+  
+  <div class="section">
+    <h3>↔️ Undo機能</h3>
+    <button onclick="undoLastAction()" style="background-color: #6c757d;">元に戻す (Undo)</button>
   </div>
   
   <div class="section">
@@ -132,7 +143,10 @@
       <strong>ステージ:</strong><br>
       • C列: 一次作業<br>
       • E列: ダブルチェック<br>
-      • G列: 最終確認
+      • G列: 最終確認<br><br>
+      
+      <strong>色の変更:</strong><br>
+      色を選択して、ボタンをクリックした後、セル番号または行番号を入力してください。
     </div>
   </div>
   
@@ -189,6 +203,90 @@
           .withSuccessHandler(() => alert('色を適用しました！'))
           .withFailureHandler((error) => alert('エラー: ' + error))
           .changeCellColor(cell, color);
+      }
+    }
+    
+    // 名札に色を適用
+    function applyNameTagColor() {
+      const color = document.getElementById('cellColor').value;
+      const cell = prompt('名札のセル番号を入力してください (例: B3, C5):');
+      
+      if (cell) {
+        google.script.run
+          .withSuccessHandler(() => alert('名札の色を変更しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .changeNameTagColor(cell, color);
+      }
+    }
+    
+    // 作業項目に色を適用
+    function applyWorkItemColor() {
+      const color = document.getElementById('cellColor').value;
+      const row = prompt('作業項目の行番号を入力してください (例: 3, 4, 5):');
+      
+      if (row) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目の色を変更しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .changeWorkItemColor(parseInt(row), color);
+      }
+    }
+    
+    // 名札を削除
+    function deleteNameTagByUser() {
+      const cell = prompt('削除する名札のセル番号を入力してください (例: B3, C5):');
+      
+      if (cell) {
+        google.script.run
+          .withSuccessHandler(() => alert('名札を削除しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .deleteNameTag(cell);
+      }
+    }
+    
+    // 作業項目を削除
+    function deleteWorkItemByUser() {
+      const row = prompt('削除する作業項目の行番号を入力してください (例: 3, 4, 5):');
+      
+      if (row) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目を削除しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .deleteWorkItem(parseInt(row));
+      }
+    }
+    
+    // 作業項目を上に移動
+    function moveWorkItemUp() {
+      const row = prompt('上に移動する作業項目の行番号を入力してください (例: 3, 4, 5):');
+      
+      if (row) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目を移動しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .moveWorkItem(parseInt(row), 'up');
+      }
+    }
+    
+    // 作業項目を下に移動
+    function moveWorkItemDown() {
+      const row = prompt('下に移動する作業項目の行番号を入力してください (例: 3, 4, 5):');
+      
+      if (row) {
+        google.script.run
+          .withSuccessHandler(() => alert('作業項目を移動しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .moveWorkItem(parseInt(row), 'down');
+      }
+    }
+    
+    // Undo機能
+    function undoLastAction() {
+      if (confirm('元に戻しますか？')) {
+        google.script.run
+          .withSuccessHandler(() => alert('元に戻しました！'))
+          .withFailureHandler((error) => alert('エラー: ' + error))
+          .undo();
       }
     }
   </script>

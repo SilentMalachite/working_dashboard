@@ -39,6 +39,12 @@
         button:hover {
             background-color: #0056b3;
         }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
 
         .dashboard-container {
             display: flex;
@@ -233,6 +239,10 @@
 
     <h1>作業ダッシュボード</h1>
 
+    <div class="controls" style="justify-content: center;">
+        <button id="undoBtn" onclick="undo()" disabled style="background-color: #6c757d;">元に戻す (Undo)</button>
+    </div>
+
     <div class="dashboard-layout">
         <!-- Name Tags Sidebar -->
         <div class="name-tag-section">
@@ -263,6 +273,156 @@
         let tagIdCounter = 0;
         let workItemIdCounter = 0;
         const STORAGE_KEY = 'workingDashboardData';
+        
+        // --- Undo Functionality ---
+        const undoHistory = [];
+        const MAX_HISTORY = 50; // 最大50件の履歴を保持
+        
+        // --- Undo Functions ---
+        function captureState() {
+            try {
+                const data = {
+                    tagIdCounter: tagIdCounter,
+                    workItemIdCounter: workItemIdCounter,
+                    nameTags: [],
+                    workItems: []
+                };
+                
+                // Capture all name tags
+                document.querySelectorAll('.name-tag').forEach(tag => {
+                    const nameSpan = tag.querySelector('span[contenteditable]');
+                    const colorInput = tag.querySelector('input[type="color"]');
+                    const parentId = tag.parentElement.id || tag.closest('.stage-content')?.parentElement?.parentElement?.id || 'nameTagPool';
+                    
+                    data.nameTags.push({
+                        id: tag.id,
+                        name: nameSpan ? nameSpan.textContent : '',
+                        color: colorInput ? colorInput.value : '#e0e0e0',
+                        parentId: parentId
+                    });
+                });
+                
+                // Capture all work items
+                document.querySelectorAll('.work-item-row').forEach(row => {
+                    const titleDiv = row.querySelector('.work-item-title');
+                    const colorInput = row.querySelector('input[type="color"]');
+                    const stages = [];
+                    
+                    row.querySelectorAll('.stage-content').forEach((stageContent, index) => {
+                        const stageNames = ['first', 'double-check', 'final'];
+                        const tagIds = Array.from(stageContent.querySelectorAll('.name-tag')).map(tag => tag.id);
+                        stages.push({
+                            name: stageNames[index],
+                            tagIds: tagIds
+                        });
+                    });
+                    
+                    data.workItems.push({
+                        id: row.id,
+                        title: titleDiv ? titleDiv.textContent : '',
+                        color: colorInput ? colorInput.value : '#ffffff',
+                        stages: stages
+                    });
+                });
+                
+                return data;
+            } catch (error) {
+                console.error('状態キャプチャエラー:', error);
+                return null;
+            }
+        }
+        
+        function addToUndoHistory() {
+            const currentState = captureState();
+            if (currentState) {
+                undoHistory.push(currentState);
+                // 履歴の上限を管理
+                if (undoHistory.length > MAX_HISTORY) {
+                    undoHistory.shift();
+                }
+                updateUndoButton();
+            }
+        }
+        
+        function undo() {
+            if (undoHistory.length === 0) {
+                alert('元に戻せる操作がありません');
+                return;
+            }
+            
+            const previousState = undoHistory.pop();
+            restoreState(previousState);
+            updateUndoButton();
+            saveToLocalStorage();
+        }
+        
+        function restoreState(data) {
+            try {
+                // Restore counters
+                tagIdCounter = data.tagIdCounter || 0;
+                workItemIdCounter = data.workItemIdCounter || 0;
+                
+                // Clear existing content
+                document.getElementById('nameTagPool').innerHTML = '';
+                document.getElementById('workItemsContainer').innerHTML = '';
+                
+                // Restore work items first (without triggering undo history)
+                data.workItems.forEach(item => {
+                    addWorkItemWithoutHistory(item.title, item.id);
+                    const row = document.getElementById(item.id);
+                    if (row) {
+                        const colorInput = row.querySelector('input[type="color"]');
+                        if (colorInput) {
+                            colorInput.value = item.color;
+                            row.style.backgroundColor = item.color;
+                        }
+                    }
+                });
+                
+                // Restore name tags (without triggering undo history)
+                data.nameTags.forEach(tagData => {
+                    addNameTagWithoutHistory(tagData.name, tagData.id);
+                    const tag = document.getElementById(tagData.id);
+                    if (tag) {
+                        const colorInput = tag.querySelector('input[type="color"]');
+                        if (colorInput) {
+                            colorInput.value = tagData.color;
+                            tag.style.backgroundColor = tagData.color;
+                        }
+                        
+                        // Move tag to correct location
+                        if (tagData.parentId !== 'nameTagPool') {
+                            const workItem = document.getElementById(tagData.parentId);
+                            if (workItem) {
+                                // Find the correct stage
+                                const savedItem = data.workItems.find(item => item.id === tagData.parentId);
+                                if (savedItem) {
+                                    savedItem.stages.forEach((stage, index) => {
+                                        if (stage.tagIds.includes(tagData.id)) {
+                                            const stageContent = workItem.querySelectorAll('.stage-content')[index];
+                                            if (stageContent) {
+                                                stageContent.appendChild(tag);
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                console.log('状態を復元しました');
+            } catch (error) {
+                console.error('復元エラー:', error);
+            }
+        }
+        
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) {
+                undoBtn.disabled = undoHistory.length === 0;
+            }
+        }
         
         // --- Auto Save Functions ---
         function saveToLocalStorage() {
@@ -438,6 +598,9 @@
             }
             
             if (dropZone && draggedElement && draggedElement.classList.contains('name-tag')) {
+                // Capture state before making changes
+                addToUndoHistory();
+                
                 dropZone.classList.remove('drag-over');
                 dropZone.appendChild(draggedElement);
                 triggerAutoSave();
@@ -449,6 +612,10 @@
             if (!confirm('すべての名札を初期位置に戻しますか？')) {
                 return;
             }
+            
+            // Capture state before making changes
+            addToUndoHistory();
+            
             const pool = document.getElementById('nameTagPool');
             const allTags = document.querySelectorAll('.name-tag');
             
@@ -462,6 +629,10 @@
             if (!confirm('すべての作業項目を削除しますか？\n（名札はプールに戻ります）')) {
                 return;
             }
+            
+            // Capture state before making changes
+            addToUndoHistory();
+            
             const pool = document.getElementById('nameTagPool');
             const rows = document.querySelectorAll('.work-item-row');
             
@@ -487,6 +658,9 @@
         }
 
         function addNameTag(name = "新しい名札") {
+            // Capture state before adding
+            addToUndoHistory();
+            
             tagIdCounter++;
             const id = `tag-${tagIdCounter}`;
             
@@ -512,11 +686,24 @@
                 triggerAutoSave();
             };
             
-            // Editable Name
+            // Editable Name (double-click to edit)
             const nameSpan = document.createElement('span');
-            nameSpan.contentEditable = true;
+            nameSpan.contentEditable = false;
             nameSpan.textContent = name;
-            nameSpan.addEventListener('blur', triggerAutoSave);
+            nameSpan.addEventListener('dblclick', function() {
+                this.contentEditable = true;
+                this.focus();
+                // Select all text for easy editing
+                const range = document.createRange();
+                range.selectNodeContents(this);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            });
+            nameSpan.addEventListener('blur', function() {
+                this.contentEditable = false;
+                triggerAutoSave();
+            });
             nameSpan.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -530,6 +717,8 @@
             deleteBtn.textContent = '×';
             deleteBtn.onclick = function() {
                 if(confirm('この名札を削除しますか？')) {
+                    // Capture state before deletion
+                    addToUndoHistory();
                     tag.remove();
                     triggerAutoSave();
                 }
@@ -543,9 +732,110 @@
             triggerAutoSave();
         }
 
+        // Helper functions to add items without triggering undo history (for restore/load)
+        function addNameTagWithoutHistory(name = "新しい名札", existingId = null) {
+            if (existingId) {
+                // Extract counter from existing ID
+                const match = existingId.match(/tag-(\d+)/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num >= tagIdCounter) {
+                        tagIdCounter = num;
+                    }
+                }
+            } else {
+                tagIdCounter++;
+            }
+            const id = existingId || `tag-${tagIdCounter}`;
+            
+            const tag = document.createElement('div');
+            tag.className = 'name-tag';
+            tag.id = id;
+            tag.draggable = true;
+            tag.ondragstart = drag;
+            tag.ondragend = dragEnd;
+            
+            // Color picker
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = '#e0e0e0';
+            colorInput.style.border = 'none';
+            colorInput.style.width = '20px';
+            colorInput.style.height = '20px';
+            colorInput.style.cursor = 'pointer';
+            colorInput.style.padding = '0';
+            colorInput.style.background = 'none';
+            colorInput.oninput = function(e) {
+                tag.style.backgroundColor = e.target.value;
+                triggerAutoSave();
+            };
+            
+            // Editable Name
+            const nameSpan = document.createElement('span');
+            nameSpan.contentEditable = false;
+            nameSpan.textContent = name;
+            nameSpan.addEventListener('dblclick', function() {
+                this.contentEditable = true;
+                this.focus();
+                const range = document.createRange();
+                range.selectNodeContents(this);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            });
+            nameSpan.addEventListener('blur', function() {
+                this.contentEditable = false;
+                triggerAutoSave();
+            });
+            nameSpan.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                }
+            });
+            
+            // Delete button
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.onclick = function() {
+                if(confirm('この名札を削除しますか？')) {
+                    addToUndoHistory();
+                    tag.remove();
+                    triggerAutoSave();
+                }
+            };
+
+            tag.appendChild(colorInput);
+            tag.appendChild(nameSpan);
+            tag.appendChild(deleteBtn);
+            
+            document.getElementById('nameTagPool').appendChild(tag);
+        }
+        
         function addWorkItem(title = "新しい作業項目") {
+            // Capture state before adding
+            addToUndoHistory();
+            
             workItemIdCounter++;
             const id = `work-item-${workItemIdCounter}`;
+            addWorkItemWithoutHistory(title, id);
+        }
+        
+        function addWorkItemWithoutHistory(title = "新しい作業項目", existingId = null) {
+            if (existingId) {
+                // Extract counter from existing ID
+                const match = existingId.match(/work-item-(\d+)/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num >= workItemIdCounter) {
+                        workItemIdCounter = num;
+                    }
+                }
+            } else {
+                workItemIdCounter++;
+            }
+            const id = existingId || `work-item-${workItemIdCounter}`;
             
             const container = document.getElementById('workItemsContainer');
             const row = document.createElement('div');
@@ -575,6 +865,8 @@
             delBtn.title = '削除';
             delBtn.onclick = () => {
                 if(confirm('この作業項目を削除しますか？')) {
+                    // Capture state before deletion
+                    addToUndoHistory();
                     const tags = row.querySelectorAll('.name-tag');
                     const pool = document.getElementById('nameTagPool');
                     tags.forEach(tag => pool.appendChild(tag));
@@ -663,6 +955,9 @@
         }
 
         function moveRow(row, direction) {
+            // Capture state before moving
+            addToUndoHistory();
+            
             const container = document.getElementById('workItemsContainer');
             if (direction === -1) {
                 if (row.previousElementSibling) {
@@ -684,6 +979,9 @@
             
             // If no saved data, add initial demo data
             if (!loaded) {
+                // Clear undo history during initial load
+                undoHistory.length = 0;
+                
                 addNameTag("佐藤");
                 addNameTag("鈴木");
                 addNameTag("田中");
@@ -693,7 +991,13 @@
                 
                 // Save initial state
                 saveToLocalStorage();
+                
+                // Clear undo history after initial setup
+                undoHistory.length = 0;
             }
+            
+            // Update undo button state
+            updateUndoButton();
         };
 
     </script>
