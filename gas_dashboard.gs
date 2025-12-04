@@ -3,7 +3,7 @@
 
 // シート名の定数
 const SHEET_NAME = '作業ダッシュボード';
-const NAME_TAG_POOL_COL = 'B';  // 名札プールの列
+const NAME_TAG_POOL_COL = 'A';  // 名札プールの列
 const WORK_ITEMS_START_ROW = 3;  // 作業項目の開始行
 const HISTORY_KEY = 'UNDO_HISTORY';  // Undo履歴のキー
 const MAX_HISTORY = 20;  // 最大履歴数
@@ -39,8 +39,8 @@ function initializeDashboard() {
   }
   
   // 列幅の設定
-  sheet.setColumnWidth(1, 150);  // A: 作業項目名
-  sheet.setColumnWidth(2, 200);  // B: 名札プール
+  sheet.setColumnWidth(1, 200);  // A: 名札プール
+  sheet.setColumnWidth(2, 150);  // B: 作業項目名
   sheet.setColumnWidth(3, 200);  // C: 一次作業
   sheet.setColumnWidth(4, 50);   // D: 矢印
   sheet.setColumnWidth(5, 200);  // E: ダブルチェック
@@ -49,7 +49,7 @@ function initializeDashboard() {
   
   // ヘッダーの設定
   sheet.getRange('A1').setValue('作業ダッシュボード').setFontSize(16).setFontWeight('bold');
-  sheet.getRange('B2').setValue('名札プール').setFontWeight('bold').setBackground('#e8eaf6');
+  sheet.getRange('A2').setValue('名札プール').setFontWeight('bold').setBackground('#e8eaf6');
   sheet.getRange('C2').setValue('一次作業').setFontWeight('bold').setBackground('#e3f2fd');
   sheet.getRange('D2').setValue('→').setHorizontalAlignment('center');
   sheet.getRange('E2').setValue('ダブルチェック').setFontWeight('bold').setBackground('#fff3e0');
@@ -89,14 +89,14 @@ function addNameTag(name, targetSheet) {
     return;
   }
   
-  // 名札プール列(B列)で空いている最初の行を探す
+  // 名札プール列(A列)で空いている最初の行を探す
   let row = 3;
-  while (sheet.getRange('B' + row).getValue() !== '') {
+  while (sheet.getRange('A' + row).getValue() !== '') {
     row++;
   }
   
   // 名札を追加
-  const cell = sheet.getRange('B' + row);
+  const cell = sheet.getRange('A' + row);
   cell.setValue(name);
   cell.setBackground('#e0e0e0');
   cell.setBorder(true, true, true, true, false, false, '#000000', SpreadsheetApp.BorderStyle.SOLID);
@@ -104,7 +104,7 @@ function addNameTag(name, targetSheet) {
   cell.setFontWeight('bold');
   
   // データ検証（他のセルにコピー可能にする）
-  const nameTagData = sheet.getRange('B' + row);
+  const nameTagData = sheet.getRange('A' + row);
   nameTagData.setNote('名札: ' + name);
 }
 
@@ -132,12 +132,12 @@ function addWorkItem(title, targetSheet) {
   
   // 空いている行を探す
   let row = 3;
-  while (sheet.getRange('A' + row).getValue() !== '') {
+  while (sheet.getRange('B' + row).getValue() !== '') {
     row++;
   }
   
   // 作業項目名
-  sheet.getRange('A' + row).setValue(title).setFontWeight('bold');
+  sheet.getRange('B' + row).setValue(title).setFontWeight('bold');
   
   // 各ステージのセル設定
   const stages = [
@@ -180,9 +180,9 @@ function resetNameTags() {
       const cell = sheet.getRange(col + row);
       const value = cell.getValue();
       
-      if (value && col !== 'A') {  // 作業項目名以外
-        // B列の名札なら収集対象外
-        if (col !== 'B') {
+      if (value && col !== 'B') {  // 作業項目名以外
+        // A列の名札なら収集対象外
+        if (col !== 'A') {
           nameTags.push(value);
           cell.clear();  // ステージから削除
           cell.setBackground(col === 'C' ? '#e3f2fd' : col === 'E' ? '#fff3e0' : '#e8f5e9');
@@ -194,7 +194,7 @@ function resetNameTags() {
   // 名札プールに戻す
   let poolRow = 3;
   nameTags.forEach(name => {
-    while (sheet.getRange('B' + poolRow).getValue() !== '') {
+    while (sheet.getRange('A' + poolRow).getValue() !== '') {
       poolRow++;
     }
     addNameTag(name, sheet);
@@ -248,7 +248,7 @@ function resetNameTagsSilent() {
   
   let poolRow = 3;
   nameTags.forEach(name => {
-    while (sheet.getRange('B' + poolRow).getValue() !== '') {
+    while (sheet.getRange('A' + poolRow).getValue() !== '') {
       poolRow++;
     }
     addNameTag(name, sheet);
@@ -306,7 +306,7 @@ function moveWorkItem(row, direction) {
   if (targetRow < 3) return;  // ヘッダーより上には移動できない
   
   // 移動先が空の場合は移動しない
-  if (sheet.getRange('A' + targetRow).getValue() === '') return;
+  if (sheet.getRange('B' + targetRow).getValue() === '') return;
   
   // 行全体を入れ替え
   const sourceRange = sheet.getRange(row + ':' + row);
@@ -431,8 +431,8 @@ function restoreState(state) {
   }
   
   // 列幅を再設定
-  sheet.setColumnWidth(1, 150);
-  sheet.setColumnWidth(2, 200);
+  sheet.setColumnWidth(1, 200);  // A: 名札プール
+  sheet.setColumnWidth(2, 150);  // B: 作業項目名
   sheet.setColumnWidth(3, 200);
   sheet.setColumnWidth(4, 50);
   sheet.setColumnWidth(5, 200);
@@ -501,7 +501,7 @@ function deleteWorkItem(row) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) return;
   
-  const title = sheet.getRange('A' + row).getValue();
+  const title = sheet.getRange('B' + row).getValue();
   const response = ui.alert('確認', '作業項目「' + title + '」を削除しますか？\n（名札は名札プールに戻ります）', ui.ButtonSet.YES_NO);
   
   if (response !== ui.Button.YES) {
@@ -526,7 +526,7 @@ function deleteWorkItem(row) {
   // 名札を名札プールに戻す
   nameTags.forEach(name => {
     let poolRow = 3;
-    while (sheet.getRange('B' + poolRow).getValue() !== '') {
+    while (sheet.getRange('A' + poolRow).getValue() !== '') {
       poolRow++;
     }
     addNameTag(name, sheet);
